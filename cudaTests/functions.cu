@@ -27,23 +27,33 @@ void reduceMultiply(int n, float*x, float*y, float *z){
 
 
 void trial1(int N){
-    for(auto i = 0; i < 100; i++){
+    for(auto j = 0; j < 100; j++){
          // 1M elemenets
         //std::cout << N << std::endl;
-        
+        //std::cout << "stop 0" << std::endl;
         float *x, *y, *z, *q;
         cudaMallocManaged(&x, N*sizeof(float));
         cudaMallocManaged(&y, N*sizeof(float));
         cudaMallocManaged(&q, 1*sizeof(float));
         cudaMallocManaged(&z, N*sizeof(float));
         
-        for (int i = 0; i < N; i++){
-            x[i] = 1.0f;
-            z[i] = 0.0f;
-            y[i] = 2.0f;
-        }
-        q[0] = 0.0f;
+        //std::cout << "stop 1" << std::endl;
+        float hx[N], hy[N], hz[N], hq[1];
         
+        for (int i = 0; i < N; i++){
+            hx[i] = 1.0f;
+            hz[i] = 0.0f;
+            hy[i] = 2.0f;
+        }
+        hq[0] = 0.0f;
+        
+        //std::cout << "stop 1" << std::endl;
+        cudaMemcpy(x,&hx,N*sizeof(float),cudaMemcpyHostToDevice);
+        cudaMemcpy(y,&hy,N*sizeof(float),cudaMemcpyHostToDevice);
+        cudaMemcpy(z,&hz,N*sizeof(float),cudaMemcpyHostToDevice);
+        cudaMemcpy(q,&hq,1*sizeof(float),cudaMemcpyHostToDevice);
+        
+        //std::cout << "stop 2" << std::endl;
         ///Run kernel, rounding number of blocks up in case N is not multiple of blocksize
         int blockSize = 256;
         int numBlocks = (N+blockSize-1) / blockSize;
@@ -56,8 +66,15 @@ void trial1(int N){
         
         cudaDeviceSynchronize();
         
-        //std::cout << q[0] << std::endl;
+        //std::cout << "stop 3" << std::endl;
+        cudaMemcpy(hx,x,N*sizeof(float),cudaMemcpyDeviceToHost);
+        cudaMemcpy(hy,y,N*sizeof(float),cudaMemcpyDeviceToHost);
+        cudaMemcpy(hz,z,N*sizeof(float),cudaMemcpyDeviceToHost);
+        cudaMemcpy(hq,q,1*sizeof(float),cudaMemcpyDeviceToHost);
         
+        std::cout << hz[0] << std::endl;
+        
+        //std::cout << "stop 4" << std::endl;
         cudaFree(x);
         cudaFree(y);
         cudaFree(q);
@@ -98,7 +115,7 @@ void trial2(int N){
 }
 
 int main(void){
-    int N = 1<<20;
+    int N = 512;
     double trial1_time = 0.0;
     for(auto j = 0; j < 11; j++){
         auto start = std::chrono::high_resolution_clock::now();
@@ -111,18 +128,6 @@ int main(void){
     trial1_time /= 10;
     std::cout << "Average for trial 1: " << trial1_time << std::endl;
     std::cout << "------------------------" << std::endl;
-    
-    double trial2_time = 0.0;
-    for(auto j = 0; j < 11; j++){
-        auto start = std::chrono::high_resolution_clock::now();
-        trial2(N);
-        auto stop = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = stop - start;
-        std::cout << "Trial 2, test " << j << " elapsed time: " << elapsed.count() << " s\n";
-        if(j > 0) trial2_time += elapsed.count(); //ignore startup trial
-    }
-    trial2_time /= 10;
-    std::cout << "Average for trial 2: " << trial2_time << std::endl;
     
     return 0;
 }
