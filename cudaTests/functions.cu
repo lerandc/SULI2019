@@ -26,7 +26,7 @@ void reduceMultiply(int n, float*x, float*y, float *z){
 }
 
 
-void trial1(int N){
+void trial1(const int N){
     for(auto j = 0; j < 100; j++){
          // 1M elemenets
         //std::cout << N << std::endl;
@@ -38,7 +38,10 @@ void trial1(int N){
         cudaMallocManaged(&z, N*sizeof(float));
         
         //std::cout << "stop 1" << std::endl;
-        float hx[N], hy[N], hz[N], hq[1];
+        float *hx = new float[N];
+        float *hy = new float[N];
+        float *hz = new float[N];
+        float *hq = new float[N];
         
         for (int i = 0; i < N; i++){
             hx[i] = 1.0f;
@@ -48,10 +51,10 @@ void trial1(int N){
         hq[0] = 0.0f;
         
         //std::cout << "stop 1" << std::endl;
-        cudaMemcpy(x,&hx,N*sizeof(float),cudaMemcpyHostToDevice);
-        cudaMemcpy(y,&hy,N*sizeof(float),cudaMemcpyHostToDevice);
-        cudaMemcpy(z,&hz,N*sizeof(float),cudaMemcpyHostToDevice);
-        cudaMemcpy(q,&hq,1*sizeof(float),cudaMemcpyHostToDevice);
+        cudaMemcpy(x,&hx[0],N*sizeof(float),cudaMemcpyHostToDevice);
+        cudaMemcpy(y,&hy[0],N*sizeof(float),cudaMemcpyHostToDevice);
+        cudaMemcpy(z,&hz[0],N*sizeof(float),cudaMemcpyHostToDevice);
+        cudaMemcpy(q,&hq[0],1*sizeof(float),cudaMemcpyHostToDevice);
         
         //std::cout << "stop 2" << std::endl;
         ///Run kernel, rounding number of blocks up in case N is not multiple of blocksize
@@ -67,18 +70,24 @@ void trial1(int N){
         cudaDeviceSynchronize();
         
         //std::cout << "stop 3" << std::endl;
-        cudaMemcpy(hx,x,N*sizeof(float),cudaMemcpyDeviceToHost);
-        cudaMemcpy(hy,y,N*sizeof(float),cudaMemcpyDeviceToHost);
-        cudaMemcpy(hz,z,N*sizeof(float),cudaMemcpyDeviceToHost);
-        cudaMemcpy(hq,q,1*sizeof(float),cudaMemcpyDeviceToHost);
+        cudaMemcpy(&hx[0],x,N*sizeof(float),cudaMemcpyDeviceToHost);
+        cudaMemcpy(&hy[0],y,N*sizeof(float),cudaMemcpyDeviceToHost);
+        cudaMemcpy(&hz[0],z,N*sizeof(float),cudaMemcpyDeviceToHost);
+        cudaMemcpy(&hq[0],q,1*sizeof(float),cudaMemcpyDeviceToHost);
         
-        std::cout << hz[0] << std::endl;
+        std::cout << hq[0] << std::endl;
         
         //std::cout << "stop 4" << std::endl;
         cudaFree(x);
         cudaFree(y);
         cudaFree(q);
         cudaFree(z);
+
+        delete [] hx;
+        delete [] hy;
+        delete [] hz;
+        delete [] hq;
+
     }
 }
 
@@ -117,7 +126,7 @@ void trial2(int N){
 int main(void){
     int N = 512;
     double trial1_time = 0.0;
-    for(auto j = 0; j < 11; j++){
+    for(auto j = 0; j < 1; j++){
         auto start = std::chrono::high_resolution_clock::now();
         trial1(N);
         auto stop = std::chrono::high_resolution_clock::now();
