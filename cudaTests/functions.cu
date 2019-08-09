@@ -2,6 +2,7 @@
 #include <math.h>
 #include "reductions.cuh"
 #include <chrono>
+#include <random>
 
 __global__
 void elementWiseMultiply(int n, float *x, float *y, float *z){
@@ -22,9 +23,28 @@ void reduceMultiply(int n, float*x, float*y, float *z){
     int idx = threadIdx.x + blockDim.x*blockIdx.x;
     if (idx < n){
         atomicAdd(&z[0], x[idx]*y[idx]);
+        if(idx == n-1) x[idx] = 10;
     }
 }
 
+__global__ void DPC_numerator_reduce(const float* psiIntensity_ds,
+									const float* q_coord,
+									float* numerator,
+									const size_t N){
+		int idx = threadIdx.x + blockDim.x * blockIdx.x;
+		if (idx < N){
+			atomicAdd(&numerator[0], psiIntensity_ds[idx]*q_coord[idx]);
+		}
+}
+
+__global__ void DPC_denominator_reduce(const float* psiIntensity_ds,
+									float* denominator,
+									const size_t N){
+	int idx = threadIdx.x + blockDim.x * blockIdx.x;
+	if (idx < N){
+		atomicAdd(&denominator[0], psiIntensity_ds[idx]);
+	}										   
+}
 
 void trial1(const int N){
     for(auto j = 0; j < 100; j++){
@@ -60,22 +80,27 @@ void trial1(const int N){
         ///Run kernel, rounding number of blocks up in case N is not multiple of blocksize
         int blockSize = 256;
         int numBlocks = (N+blockSize-1) / blockSize;
-        elementWiseMultiply <<< numBlocks, 256 >>> (N,x,y,z);
+        //elementWiseMultiply <<< numBlocks, 256 >>> (N,x,y,z);
         
         //wait for synchro
+        //cudaDeviceSynchronize();
+        
+        reduceMultiply <<<  numBlocks, 256 >>> (N,x,y,q);
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) 
+            printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
         
-        reduction <<<  numBlocks, 256 >>> (N,z,q);
-        
-        cudaDeviceSynchronize();
-        
+        //std::cout << "dq: " << q[0] << std::endl;
         //std::cout << "stop 3" << std::endl;
         cudaMemcpy(&hx[0],x,N*sizeof(float),cudaMemcpyDeviceToHost);
         cudaMemcpy(&hy[0],y,N*sizeof(float),cudaMemcpyDeviceToHost);
         cudaMemcpy(&hz[0],z,N*sizeof(float),cudaMemcpyDeviceToHost);
         cudaMemcpy(&hq[0],q,1*sizeof(float),cudaMemcpyDeviceToHost);
         
-        std::cout << hq[0] << std::endl;
+        //std::cout << "hq: " << hq[0] << std::endl;
+        //std::cout << hq[0] << std::endl;
+        //std::cout << hx[N-1] << std::endl;
         
         //std::cout << "stop 4" << std::endl;
         cudaFree(x);
@@ -135,8 +160,71 @@ int main(void){
         if(j > 0) trial1_time += elapsed.count(); //ignore startup trial
     }
     trial1_time /= 10;
-    std::cout << "Average for trial 1: " << trial1_time << std::endl;
-    std::cout << "------------------------" << std::endl;
+    //std::cout << "Average for trial 1: " << trial1_time << std::endl;
+	//std::cout << "------------------------" << std::endl;
+	
+
+	std::random_device rd;
+    std::mt19937 e2(rd());
+	std::uniform_real_distribution<> dist(0, 1000);
+
+	float qxa[N];
+	for(auto i = 0; i < N; i++) qxa[i] = i;
+	
+	float psi[N];
+	for(auto i = 0; i < N; i++) psi[i] = dist(e2)/1000;
+
+	//calculate DPC analogue on CPU side
+
+	//numerator
+	float num = 0;
+	for(auto i = 0; i < N; i++) num += qxa[i]*psi[i];
+	
+	//denominator
+	float den = 0;
+	for(auto i = 0; i < N; i++) den += psi[i];
+
+	//DPC
+	std::cout << "CPU DPC_CoM    :" << num/den << std::endl;
+	std::cout << "CPU numerator  :" << num << std::endl;
+	std::cout << "CPU denominator:" << den << std::endl;
+	std::cout << "------------------------" << std::endl;
+
+
+	//calculate DPC analogue on GPU side
+
+	//allocate variables
+	float *qxa_d;
+	float *psi_d;
+	float *num_d;
+	float *den_d;
+	cudaMallocManaged(&qxa_d,N*sizeof(float));
+	cudaMallocManaged(&psi_d,N*sizeof(float));
+	cudaMallocManaged(&num_d,1*sizeof(float));
+	cudaMallocManaged(&den_d,1*sizeof(float));
+
+	//initialize variables
+	float *zero = new float[1];
+	zero[0] = 0.0;
+	cudaMemcpy(qxa_d,&qxa[0],N*sizeof(float),cudaMemcpyHostToDevice);
+	cudaMemcpy(psi_d,&psi[0],N*sizeof(float),cudaMemcpyHostToDevice);
+	cudaMemcpy(num_d,&zero[0],1*sizeof(float),cudaMemcpyHostToDevice);
+	cudaMemcpy(den_d,&zero[0],1*sizeof(float),cudaMemcpyHostToDevice);
+
+	DPC_numerator_reduce <<< 2, 256 >>> (psi_d,qxa_d,num_d,N);
+	DPC_denominator_reduce <<< 2, 256 >>> (psi_d,den_d,N);
+
+	float DPC_gpu = num_d[0] / den_d[0];
+	std::cout << "GPU DPC_CoM    :" << DPC_gpu << std::endl;
+	std::cout << "GPU numerator  :" << num_d[0] << std::endl;
+	std::cout << "GPU denominator:" << den_d[0] << std::endl;
+
+	cudaFree(qxa_d);
+	cudaFree(psi_d);
+	cudaFree(num_d);
+	cudaFree(den_d);
+	free(zero);
+
     
     return 0;
 }

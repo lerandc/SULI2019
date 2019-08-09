@@ -1,0 +1,42 @@
+testDict contents:
+AuDeca.h5 filestructure:
+--4DSTEM_experiment
+----data
+------datacubes
+------diffractionslices
+------pointlistarrays
+------pointlists
+------realslices
+----log
+----metadata
+------metadata_1
+--------calibration
+--------comments
+--------microscope
+--------original
+--------sample
+--------user
+Sample_LFP_datacube.h5 filestructure:
+--4DSTEM_experiment
+----data
+------datacubes
+--------datacube
+----------datacube
+----------dim1
+----------dim2
+----------dim3
+----------dim4
+------diffractionslices
+------pointlistarrays
+------pointlists
+------realslices
+----metadata
+------metadata_0
+--------calibration
+--------comments
+--------microscope
+--------original
+----------all
+----------shortlist
+--------sample
+--------user

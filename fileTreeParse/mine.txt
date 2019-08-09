@@ -1,0 +1,50 @@
+HDF5 "AuDeca_test.h5" {
+GROUP "/" {
+   ATTRIBUTE "version_major" {
+      DATATYPE  H5T_STD_I32LE
+      DATASPACE  SCALAR
+      DATA {
+      (0): 0
+      }
+   }
+   ATTRIBUTE "version_minor" {
+      DATATYPE  H5T_STD_I32LE
+      DATASPACE  SCALAR
+      DATA {
+      (0): 4
+      }
+   }
+   GROUP "4DSTEM_experiment" {
+      GROUP "data" {
+         GROUP "datacubes" {
+         }
+         GROUP "diffractionslices" {
+         }
+         GROUP "pointlistarrays" {
+         }
+         GROUP "pointlists" {
+         }
+         GROUP "realslices" {
+         }
+      }
+      GROUP "log" {
+      }
+      GROUP "metadata" {
+         GROUP "metadata_1" {
+            GROUP "calibration" {
+            }
+            GROUP "comments" {
+            }
+            GROUP "microscope" {
+            }
+            GROUP "original" {
+            }
+            GROUP "sample" {
+            }
+            GROUP "user" {
+            }
+         }
+      }
+   }
+}
+}
